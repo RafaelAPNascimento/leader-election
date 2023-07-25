@@ -1,9 +1,8 @@
-package distributed.systems;
+package cluster.management;
 
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
@@ -12,27 +11,14 @@ public class LeaderElection implements Watcher {
 
     private static final Logger LOGGER = Logger.getLogger(LeaderElection.class.getName());
 
-    private static final String ZOOKEEPER_ADDRESS = "localhost:2181";
-    private static final int SESSION_TIMEOUT = 3000;
     private static final String ELECTION_NAMESPACE = "/election";
 
     private String currentZnodeName;
 
     private ZooKeeper zooKeeper;
 
-    public static void main(String[] args) throws IOException, InterruptedException, KeeperException {
-
-        LeaderElection leaderElection = new LeaderElection();
-
-        leaderElection.connectToZookeeper();
-
-        leaderElection.volunteerForLeadership();
-        leaderElection.reelectLeader();
-
-        leaderElection.run();
-        leaderElection.close();
-
-        LOGGER.info("This znode just disconnected from Zookeeper, exiting application");
+    public LeaderElection(ZooKeeper zooKeeper) {
+        this.zooKeeper = zooKeeper;
     }
 
     public void volunteerForLeadership() throws InterruptedException, KeeperException {
@@ -71,35 +57,10 @@ public class LeaderElection implements Watcher {
         LOGGER.info("Watching znode " + predecessorZNodeName);
     }
 
-    private void run() throws InterruptedException {
-        synchronized (zooKeeper) {
-            zooKeeper.wait();
-        }
-    }
-
-    private void close() throws InterruptedException {
-        zooKeeper.close();
-    }
-
-    public void connectToZookeeper() throws IOException {
-        this.zooKeeper = new ZooKeeper(ZOOKEEPER_ADDRESS, SESSION_TIMEOUT, this);
-    }
-
     @Override
     public void process(WatchedEvent event) {
 
         switch (event.getType()) {
-            case None:
-                if (event.getState() == Event.KeeperState.SyncConnected) {
-                    LOGGER.info("Successfully connected to Zookeeper!");
-                }
-                else {
-                    synchronized (zooKeeper) {
-                        zooKeeper.notifyAll();
-                        LOGGER.info("Disconnected from Zookeeper event");
-                    }
-                }
-                break;
             case NodeDeleted:
                 try {
                     reelectLeader();
